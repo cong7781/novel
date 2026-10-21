@@ -142,9 +142,24 @@ export function View(props) {
 }
 
 function GraphPanel({ meta }) {
-  const nodes = meta.nodes
-  const edges = meta.edges
   const stats = meta.stats ?? {}
+  // A 98-character cast is not readable in a 430px card: show the main cast, and say so. The
+  // standalone viewer draws the rest (it has a "显示多少人" control and a much larger canvas).
+  const CARD_NODE_LIMIT = 40
+  const visible = React.useMemo(() => {
+    if (meta.nodes.length <= CARD_NODE_LIMIT) return { nodes: meta.nodes, edges: meta.edges, hidden: 0 }
+    const top = [...meta.nodes]
+      .sort((a, b) => (b.mentions ?? 0) - (a.mentions ?? 0))
+      .slice(0, CARD_NODE_LIMIT)
+    const ids = new Set(top.map((node) => node.id))
+    return {
+      nodes: top,
+      edges: meta.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)),
+      hidden: meta.nodes.length - top.length,
+    }
+  }, [meta])
+  const nodes = visible.nodes
+  const edges = visible.edges
 
   const [pair, setPair] = React.useState({ first: null, second: null })
   const [width, setWidth] = React.useState(640)
@@ -339,6 +354,13 @@ function GraphPanel({ meta }) {
           全部 {stats.edges ?? edges.length} 条边的证据都在原文里逐字核对通过（通过率{' '}
           {Math.round((stats.evidencePassRate ?? 1) * 100)}%）；{stats.chunks} 个分块合并，认出了{' '}
           {stats.aliasMerges ?? 0} 个重复称呼。
+        </span>
+      ) : null}
+
+      {visible.hidden > 0 ? (
+        <span style={styles.stats}>
+          人物太多，卡片里只画出场最多的 {nodes.length} 位（共 {meta.nodes.length} 位，{visible.hidden}{' '}
+          位未画）；独立网页端可以看全部，并按人数筛选。
         </span>
       ) : null}
 

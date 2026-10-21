@@ -58,7 +58,7 @@
   },
   "scripts": {
     "build": "node scripts/build-client.mjs",
-    "test": "node scripts/test-highlight.mjs && node scripts/test-host.mjs && node scripts/test-pipeline.mjs && node scripts/test-client.mjs && node scripts/check-secrets.mjs",
+    "test": "node scripts/test-highlight.mjs && node scripts/test-host.mjs && node scripts/test-host-adapter.mjs && node scripts/test-pipeline.mjs && node scripts/test-client.mjs && node scripts/check-secrets.mjs",
     "extract": "node scripts/extract-cli.mjs",
     "viewer": "node scripts/serve.mjs",
     "build:viewer": "node scripts/build-viewer.mjs",

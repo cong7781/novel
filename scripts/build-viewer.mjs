@@ -20,20 +20,9 @@ const outPath = resolve(root, process.argv[3] ?? 'out/character-graph.html')
 
 const data = JSON.parse(await readFile(dataPath, 'utf8'))
 
-const bundle = await build({
-  absWorkingDir: root,
-  entryPoints: ['scripts/viewer/app.js'],
-  bundle: true,
-  write: false,
-  format: 'iife',
-  platform: 'browser',
-  target: ['es2020'],
-  minify: true,
-  legalComments: 'none',
-  logLevel: 'warning',
-})
+const bundle = await buildBundle()
 
-const script = bundle.outputFiles[0].text
+const script = bundle.text
 const stats = data.stats ?? {}
 const stamp = Date.now().toString(36)
 const droppedReasons = (stats.droppedReasons ?? [])
@@ -45,6 +34,19 @@ const droppedNote =
     : ''
 
 const STATS_HINT = `≤ 600,000 字；超过 8,000 字自动分块，超过 5 万字走检索式抽取`
+
+// A 155-character cast cannot be read at any zoom; the page draws the main cast and lets the reader
+// ask for the rest. The option list comes from the data, so a 9-person graph offers no cut at all.
+const totalNodes = (data.nodes ?? []).length
+const visiblePresets = [20, 40, 80].filter((n) => n < totalNodes).concat(totalNodes)
+const visibleDefault = totalNodes > 40 ? 40 : totalNodes
+const visibleOptions = visiblePresets
+  .map(
+    (n) =>
+      `<option value="${n}"${n === visibleDefault ? ' selected' : ''}>` +
+      `${n === totalNodes ? `全部（${n}）` : `${n} 人`}</option>`,
+  )
+  .join('')
 
 const html = `<!doctype html>
 <html lang="zh-CN" data-theme="dark">
@@ -213,6 +215,10 @@ const html = `<!doctype html>
     padding: 12px 16px; margin-bottom: 14px;
   }
   #technical-tools .label { font-size: 12.5px; color: var(--muted); }
+  #technical-tools select {
+    padding: 6px 9px; border-radius: 9px; font: inherit; font-size: 12.5px; color: var(--text);
+    background: var(--panel-strong); border: 1px solid var(--line);
+  }
 
   /* ── run stats ───────────────────────────────────────────────────────────────────── */
   #run-stats {
@@ -302,6 +308,8 @@ const html = `<!doctype html>
     <div id="technical-tools" class="glass">
       <span class="label">历史产物</span>
       <select id="runs" aria-label="载入历史产物"><option value="">（载入一次之前的运行）</option></select>
+      <span class="label">显示</span>
+      <select id="visible-count" aria-label="显示多少个角色">${visibleOptions}</select>
       <span class="label">切到某次运行就能看到它的图、成本与证据；不会重新调用模型。</span>
     </div>
     ${droppedNote ? `<div class="glass" style="padding:11px 16px;margin-bottom:14px">${droppedNote}</div>` : ''}
@@ -335,4 +343,57 @@ console.log(`  ${data.nodes.length} nodes / ${data.edges.length} edges / ${stats
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char])
+}
+
+/**
+ * Bundle the viewer.
+ *
+ * esbuild is the normal route: one minified file, tree-shaken. It is a native service that talks to
+ * the JavaScript side over stdio pipes, and a confined sandbox forbids exactly that (`spawn EPERM`),
+ * so a refused spawn falls back to concatenating the same sources by hand — the d3-force UMD build
+ * (which installs `globalThis.d3`), then `src/highlight.js` with its `export` keywords stripped, then
+ * `scripts/viewer/app.js` with its two import lines dropped. Everything shares one function scope,
+ * so the names resolve exactly as they did under the bundler; the page stays self-contained either
+ * way, just larger.
+ */
+async function buildBundle() {
+  try {
+    const result = await build({
+      absWorkingDir: root,
+      entryPoints: ['scripts/viewer/app.js'],
+      bundle: true,
+      write: false,
+      format: 'iife',
+      platform: 'browser',
+      target: ['es2020'],
+      minify: true,
+      legalComments: 'none',
+      logLevel: 'warning',
+    })
+    return { text: result.outputFiles[0].text, via: 'esbuild' }
+  } catch (error) {
+    const message = String(error?.message ?? error)
+    if (!/\bEPERM\b|spawn|ENOENT/.test(message)) throw error
+    console.warn(`esbuild 无法启动（${message.split('\n')[0]}），改用内联拼接打包`)
+    return { text: await bundleWithoutEsbuild(), via: 'inline' }
+  }
+}
+
+async function bundleWithoutEsbuild() {
+  const [d3, highlight, app] = await Promise.all([
+    readFile(resolve(root, 'node_modules/d3-force/dist/d3-force.min.js'), 'utf8'),
+    readFile(resolve(root, 'src/highlight.js'), 'utf8'),
+    readFile(resolve(root, 'scripts/viewer/app.js'), 'utf8'),
+  ])
+  const highlightBody = highlight.replace(/^export\s+(?=(?:const|let|var|function|class)\b)/gm, '')
+  const appBody = app.replace(/^import\s[^\n]*\n/gm, '')
+  return [
+    '(function () {',
+    '// d3-force UMD build: installs globalThis.d3 when no module system is present.',
+    d3,
+    'const { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } = globalThis.d3;',
+    highlightBody,
+    appBody,
+    '})();',
+  ].join('\n')
 }

@@ -179,7 +179,13 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
   let retrievalToken = 0
 
   const width = Math.max(320, graphRoot.clientWidth || 900)
-  const RADIUS = radiusFor(width)
+  // Node size answers to the node count, not just to the canvas: 155 characters at the 12-node radius
+  // is a ball of wool. Density shrinks the discs (and the label font) so the graph stays readable.
+  const density = Math.min(1, Math.sqrt(20 / Math.max(1, nodes.length)))
+  const RADIUS = Math.max(4, Math.round(radiusFor(width) * density))
+  const LABEL_FONT = Math.max(8, Math.round(12.5 * Math.max(0.62, density)))
+  const EDGE_FONT = Math.max(8, Math.round(11.5 * Math.max(0.7, density)))
+  const LABEL_GAP = Math.max(10, Math.round(22 * Math.max(0.5, density)))
   // The canvas is the graph's frame, and it is meant to be filled rather than decorated with margins.
   // It also stops growing at the viewport: a graph taller than the screen would scroll, and the
   // point of the frame is that the whole network is visible at once.
@@ -267,13 +273,36 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
     defs.appendChild(gradient)
   }
 
-  const lineEls = edges.map((edge, index) => {
-    const color = COLOR[categoryOf(edge.relation)]
+  /**
+   * One drawn line per *pair*, not per evidence.
+   *
+   * A novel puts up to three quotes on the same two people; drawing three overlapping lines is what
+   * turned the 155-character graph into a hairball. The evidence stays intact in the data (and in the
+   * pair panel); the drawing keeps one edge per pair, tinted and thickened by its strongest beat.
+   */
+  const pairMap = new Map()
+  for (const edge of edges) {
+    const key = edge.source < edge.target ? `${edge.source}|${edge.target}` : `${edge.target}|${edge.source}`
+    let entry = pairMap.get(key)
+    if (!entry) {
+      entry = { source: edge.source, target: edge.target, from: edge.from, to: edge.to, strength: 0, relation: '其他', indexes: [] }
+      pairMap.set(key, entry)
+    }
+    entry.indexes.push(edge.index)
+    if ((edge.strength ?? 3) > entry.strength) {
+      entry.strength = edge.strength ?? 3
+      entry.relation = edge.relation
+    }
+  }
+  const pairs = [...pairMap.values()]
+
+  const lineEls = pairs.map((pair, index) => {
+    const color = COLOR[categoryOf(pair.relation)]
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
     line.setAttribute('class', 'cg-edge')
     line.setAttribute('stroke', color)
     line.setAttribute('stroke-linecap', 'round')
-    line.setAttribute('stroke-width', String(1 + (edge.strength ?? 3) * 0.45))
+    line.setAttribute('stroke-width', String(1 + pair.strength * 0.45))
     line.setAttribute('stroke-opacity', '0')
     if (!reduceMotion) {
       // Draw-on: start fully offset and let paint() animate the dash to zero.
@@ -281,7 +310,7 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
       line.style.strokeDashoffset = '1400'
       line.style.transition =
         'stroke-opacity 320ms ease, stroke-width 320ms ease, ' +
-        `stroke-dashoffset 950ms cubic-bezier(.4,0,.2,1) ${120 + index * 26}ms`
+        `stroke-dashoffset 950ms cubic-bezier(.4,0,.2,1) ${120 + Math.min(index, 60) * 12}ms`
     }
     linkLayer.appendChild(line)
     return line
@@ -289,7 +318,7 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
 
   // Energy dots that travel along a highlighted edge — the cheapest way to make "these two are
   // connected" feel like a live wire instead of a drawn line.
-  const flowEls = edges.map(() => {
+  const flowEls = pairs.map(() => {
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
     line.setAttribute('stroke', '#ffffff')
     line.setAttribute('stroke-opacity', '0')
@@ -301,22 +330,21 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
     return line
   })
 
-  // One label per edge, drawn only while that edge is highlighted — a permanent label cloud is
-  // unreadable at nine characters, and the relation type is exactly what a reader wants at the
-  // moment they are looking at one edge.
-  const labelEls = edges.map((edge) => {
-    const color = COLOR[categoryOf(edge.relation)]
+  // One label per pair, drawn only while that pair is highlighted — a permanent label cloud is
+  // unreadable at nine characters, and the relation type is what a reader wants at that moment.
+  const labelEls = pairs.map((pair) => {
+    const color = COLOR[categoryOf(pair.relation)]
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text')
     text.setAttribute('class', 'cg-edge-label')
     text.setAttribute('text-anchor', 'middle')
-    text.setAttribute('font-size', '11.5')
+    text.setAttribute('font-size', String(EDGE_FONT))
     text.setAttribute('fill', color)
     text.setAttribute('stroke', 'var(--bg)')
     text.setAttribute('stroke-width', '3.5')
     text.setAttribute('paint-order', 'stroke')
     text.setAttribute('opacity', '0')
     text.style.pointerEvents = 'none'
-    text.textContent = edge.relation ?? ''
+    text.textContent = pair.relation ?? ''
     linkLayer.appendChild(text)
     return text
   })
@@ -333,14 +361,14 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
 
     const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
     halo.setAttribute('class', 'cg-halo')
-    halo.setAttribute('r', String(RADIUS + 9))
+    halo.setAttribute('r', String(RADIUS + Math.max(5, Math.round(9 * density))))
     halo.setAttribute('fill', 'none')
     halo.setAttribute('stroke', '#5b8def')
     halo.setAttribute('stroke-width', '2')
     halo.setAttribute('opacity', '0')
 
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-    hit.setAttribute('r', String(RADIUS + 10))
+    hit.setAttribute('r', String(RADIUS + Math.max(6, Math.round(10 * density))))
     hit.setAttribute('fill', 'transparent')
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
@@ -355,7 +383,7 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
     const label = document.createElementNS('http://www.w3.org/2000/svg', 'text')
     label.setAttribute('class', 'cg-label')
     label.setAttribute('text-anchor', 'middle')
-    label.setAttribute('font-size', '12.5')
+    label.setAttribute('font-size', String(LABEL_FONT))
     label.setAttribute('fill', 'currentColor')
     label.setAttribute('fill-opacity', '0.95')
     label.setAttribute('stroke', 'var(--bg)')
@@ -394,6 +422,33 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
   // Layout springs scale with the canvas so a bigger frame spreads the graph instead of leaving a
   // small cluster in the middle of a large empty panel.
   const spread = RADIUS / 18
+
+  /**
+   * How many characters are drawn at once.
+   *
+   * A 155-character cast is not a readable graph at any zoom level — the honest fix is to draw the
+   * main cast and let the reader ask for the rest. The cut is by mentions (the model saw them most),
+   * and it drives nodes, edges and the layout fit together so nothing dangles.
+   */
+  const nodeElsById = new Map(nodeEls.map((element) => [element.node.id, element]))
+  const labelOrder = [...nodes].sort(
+    (a, b) => (b.mentions ?? b.independent ?? 0) - (a.mentions ?? 0) || a.name.localeCompare(b.name, 'zh'),
+  )
+  const visibleCountEl = document.getElementById('visible-count')
+  const requested = Number.parseInt(visibleCountEl?.value ?? '', 10)
+  let visibleLimit = Number.isFinite(requested) && requested > 0 ? Math.min(nodes.length, requested) : nodes.length
+  let visibleIds = new Set(labelOrder.slice(0, visibleLimit).map((node) => node.id))
+
+  const onVisibleCountChange = () => {
+    const next = Number.parseInt(visibleCountEl?.value ?? '', 10)
+    if (!Number.isFinite(next) || next <= 0) return
+    visibleLimit = Math.max(1, Math.min(nodes.length, next))
+    visibleIds = new Set(labelOrder.slice(0, visibleLimit).map((node) => node.id))
+    fitted = true
+    fitToView()
+    paint()
+  }
+  visibleCountEl?.addEventListener('change', onVisibleCountChange)
   const simulation = forceSimulation(nodes)
     .force(
       'link',
@@ -418,21 +473,29 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
   }
 
   function paint() {
-    edges.forEach((edge, index) => {
-      const source = edge.from
-      const target = edge.to
-      const visual = edgeVisual(focus, index)
-      const line = lineEls[index]
+    // A dense graph needs quieter lines: the same busy web at full opacity reads as noise, while the
+    // highlighted pair still pops because everything else steps back.
+    const edgeAlpha = pairs.length > 160 ? 0.42 : pairs.length > 80 ? 0.55 : 1
+    pairs.forEach((pair, index) => {
+      const source = pair.from
+      const target = pair.to
+      const hitIndex = pair.indexes.find((edgeIndex) => focus.edgeIndexes.has(edgeIndex))
+      const visual = edgeVisual(focus, hitIndex ?? pair.indexes[0])
+      const visible = visibleIds.has(pair.source) && visibleIds.has(pair.target)
       const x1 = screenX(source.x ?? 0)
       const y1 = screenY(source.y ?? 0)
       const x2 = screenX(target.x ?? 0)
       const y2 = screenY(target.y ?? 0)
+      const line = lineEls[index]
       line.setAttribute('x1', String(x1))
       line.setAttribute('y1', String(y1))
       line.setAttribute('x2', String(x2))
       line.setAttribute('y2', String(y2))
-      line.setAttribute('stroke-opacity', String(visual.opacity))
-      line.setAttribute('stroke-width', String((1 + (edge.strength ?? 3) * 0.45) * visual.widthFactor))
+      line.setAttribute('stroke-opacity', visible ? String(visual.opacity * edgeAlpha) : '0')
+      // Extra beats between the same two people thicken the line a little: the pair panel still shows
+      // all of them, but the drawing says "these two have history" instead of stacking three lines.
+      const beatBonus = Math.min(2, (pair.indexes.length - 1) * 0.6)
+      line.setAttribute('stroke-width', String((1 + pair.strength * 0.45 + beatBonus) * visual.widthFactor))
       if (!reduceMotion) line.style.strokeDashoffset = '0'
 
       const flow = flowEls[index]
@@ -440,25 +503,27 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
       flow.setAttribute('y1', String(y1))
       flow.setAttribute('x2', String(x2))
       flow.setAttribute('y2', String(y2))
-      flow.setAttribute('stroke-opacity', visual.highlighted ? '0.9' : '0')
+      flow.setAttribute('stroke-opacity', visible && visual.highlighted ? '0.9' : '0')
       flow.style.animation =
-        visual.highlighted && !reduceMotion ? 'cg-flow 1.15s linear infinite' : 'none'
+        visible && visual.highlighted && !reduceMotion ? 'cg-flow 1.15s linear infinite' : 'none'
 
       const label = labelEls[index]
       label.setAttribute('x', String((x1 + x2) / 2))
       label.setAttribute('y', String((y1 + y2) / 2 - 7))
-      label.setAttribute('opacity', visual.highlighted ? '1' : '0')
+      label.setAttribute('opacity', visible && visual.highlighted ? '1' : '0')
     })
 
     nodes.forEach((node, index) => {
       const element = nodeEls[index]
       const visual = nodeVisual(focus, node.id)
       const selected = isFocused(node.id)
+      const visible = visibleIds.has(node.id)
       element.outer.setAttribute(
         'transform',
         `translate(${screenX(node.x ?? 0)}, ${screenY(node.y ?? 0)})`,
       )
-      element.outer.style.opacity = String(visual.opacity)
+      element.outer.style.opacity = visible ? String(visual.opacity) : '0'
+      element.outer.style.pointerEvents = visible ? '' : 'none'
       if (!drag || drag.node !== node) {
         element.inner.style.transform = `scale(${focus.mode === 'none' ? 1 : visual.radiusFactor})`
       }
@@ -472,9 +537,37 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
         : 'drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45))'
       element.halo.setAttribute('opacity', selected ? '0.55' : '0')
       element.halo.classList.toggle('cg-halo--on', selected && !reduceMotion)
-      element.label.setAttribute('y', String(RADIUS * (focus.mode === 'none' ? 1 : visual.radiusFactor) + 22))
-      element.label.style.opacity = visual.opacity > 0.5 ? '1' : '0.45'
+      element.label.setAttribute('y', String(RADIUS * (focus.mode === 'none' ? 1 : visual.radiusFactor) + LABEL_GAP))
     })
+
+    // Labels: a name under every disc is unreadable at 155 nodes, so they are placed greedily by
+    // importance (mentions first) and a label that would overlap an already-placed one is hidden.
+    // Focused and hovered characters always win a slot.
+    const placed = []
+    for (const node of labelOrder) {
+      const element = nodeElsById.get(node.id)
+      if (!element) continue
+      const selected = isFocused(node.id)
+      if (!visibleIds.has(node.id)) {
+        element.label.style.opacity = '0'
+        continue
+      }
+      const cx = screenX(node.x ?? 0)
+      const cy = screenY(node.y ?? 0) + RADIUS + LABEL_GAP
+      const halfWidth = (node.name.length * LABEL_FONT * 0.95) / 2 + 3
+      const halfHeight = LABEL_FONT * 0.72
+      const box = { left: cx - halfWidth, right: cx + halfWidth, top: cy - halfHeight, bottom: cy + halfHeight }
+      const overlaps = placed.some(
+        (other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top,
+      )
+      if (overlaps && !selected) {
+        element.label.style.opacity = '0'
+        continue
+      }
+      placed.push(box)
+      const visual = nodeVisual(focus, node.id)
+      element.label.style.opacity = visual.opacity > 0.5 ? '1' : '0.35'
+    }
   }
 
   function pulse(id) {
@@ -678,9 +771,13 @@ export function mountGraph(data, graphRoot, evidenceRoot) {
    * graph never turns into a ribbon; labels and circles keep their size because only positions map.
    */
   function fitToView() {
-    if (nodes.length === 0) return
-    const xs = nodes.map((node) => node.x ?? 0)
-    const ys = nodes.map((node) => node.y ?? 0)
+    // Fit the characters that are actually drawn: fitting all 155 while showing 40 would push the
+    // visible cast into a corner of the frame.
+    const active = nodes.filter((node) => visibleIds.has(node.id))
+    const pool = active.length > 0 ? active : nodes
+    if (pool.length === 0) return
+    const xs = pool.map((node) => node.x ?? 0)
+    const ys = pool.map((node) => node.y ?? 0)
     const minX = Math.min(...xs)
     const maxX = Math.max(...xs)
     const minY = Math.min(...ys)
@@ -1100,6 +1197,22 @@ async function pollJob(id, onProgress) {
 }
 
 if (window.__GRAPH_DATA__) show(window.__GRAPH_DATA__)
+
+// `?run=<目录名>` opens that run instead of the graph baked into the page: the baked one is whatever
+// was latest when the page was built, which is exactly the wrong answer after a new extraction.
+const runParam = new URLSearchParams(location.search).get('run')
+if (runParam && isServed()) {
+  void fetch(`/api/runs/${encodeURIComponent(runParam)}`)
+    .then((response) => (response.ok ? response.json() : null))
+    .then((loaded) => {
+      if (!loaded || loaded.error || !Array.isArray(loaded.nodes)) return
+      loaded.runId = runParam
+      show(loaded)
+      const status = document.getElementById('upload-status')
+      if (status) status.textContent = `已载入 ${runParam}：${loaded.stats?.chars ?? '?'} 字、${loaded.nodes.length} 位角色`
+    })
+    .catch(() => {})
+}
 
 void wireRunPicker()
 

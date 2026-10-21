@@ -32,6 +32,7 @@ D:\code\dsh-character-graph
 - 安装/启停属于 profile 操作，**需要 `danger-full-access` 或逐次批准**；pnpm 若拦下依赖构建脚本，还要单独批准（本插件没有构建脚本，正常不会遇到）。
 - 用 GitHub 地址时，DSH 会先 `git ls-remote` 探一次仓库连通性；GitHub 不可达会直接报错，不会把 profile 改坏。
 - **仓库名是 `novel`，包名是 `dsh-character-graph`**：DSH 按 `package.json` 的 `name` 注册插件与工具，两者不必一致，但填安装 spec 时要用 `github:cong7781/novel`。
+- 如果安装报 `Permission denied (publickey)`：`github:` 简写会被展开成 SSH 地址，改成 `https://github.com/cong7781/novel`，或先配 SSH key。
 
 **装上就能用**，因为抽取走的是**对方 DSH 自己的模型**（`ctx.llm` + `ctx.agentDefaultModel`）：不需要任何 API key，也不需要本地服务，费用记在他们自己的账号上。前提只有一个：对方的 DSH 里配置了默认模型。
 

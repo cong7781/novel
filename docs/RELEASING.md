@@ -66,6 +66,11 @@ D:\code\dsh-character-graph                          # 本地目录（开发用�
 GitHub 不通、私有库没凭据，会**在改动 profile 之前**失败，不会留下半装状态。
 git / tarball spec 的版本兼容性检查发生在装完之后（失败会回滚 manifest 与 lockfile）。
 
+> **实测坑**：`github:user/repo` 这种简写会被 npm / pnpm 展开成 `git@github.com:user/repo`（**SSH**）。
+> 没有配 SSH key 的机器会直接报 `git@ssh.github.com: Permission denied (publickey)`，尽管仓库是公开的。
+> 这时改用完整 HTTPS 地址 `https://github.com/cong7781/novel`，或先配一把 SSH key，或走本地目录 / tarball。
+> DSH 的插件管理器文档也明确写了 pnpm 存在 HTTPS→SSH 的回退路径。
+
 安装入口有两个：
 
 - **网页侧边栏 → 插件页**：粘贴 spec、装、启用/停用、取消选择组合包；

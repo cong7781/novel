@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # check-secrets.mjs walks every commit, so the history has to be there.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -26,6 +29,9 @@ jobs:
       # The client bundle is committed, so this only proves it is reproducible and current.
       - name: rebuild client bundle
         run: pnpm run build
+
+      - name: scan history for credentials
+        run: pnpm run check:secrets
 
       # Offline only. test-serve.mjs and probe-model.mjs need a live provider and are not run here.
       - name: assertions

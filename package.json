@@ -58,11 +58,12 @@
   },
   "scripts": {
     "build": "node scripts/build-client.mjs",
-    "test": "node scripts/test-highlight.mjs && node scripts/test-host.mjs && node scripts/test-pipeline.mjs && node scripts/test-client.mjs",
+    "test": "node scripts/test-highlight.mjs && node scripts/test-host.mjs && node scripts/test-pipeline.mjs && node scripts/test-client.mjs && node scripts/check-secrets.mjs",
     "extract": "node scripts/extract-cli.mjs",
     "viewer": "node scripts/serve.mjs",
     "build:viewer": "node scripts/build-viewer.mjs",
-    "fixtures:long": "node scripts/make-longtext.mjs"
+    "fixtures:long": "node scripts/make-longtext.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "devDependencies": {
     "d3-force": "^3.0.0",

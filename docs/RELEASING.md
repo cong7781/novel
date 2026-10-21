@@ -32,7 +32,7 @@ git push -u origin main
 ```bash
 git status --short          # node_modules/ 与 out/ 必须是 ignored，不能出现在列表里
 npm test                   # 四套离线断言全绿（highlight / host / pipeline / client）
-git grep -nE "sk-[A-Za-z0-9]{16,}" -- . ':!pnpm-lock.yaml'   # 仓库里不能有 key
+npm run check:secrets      # 扫全部提交里的 key/令牌形状字符串（有命中会 exit 1）
 ```
 
 `.gitignore` 已经排除 `node_modules/`、`out/`（运行产物、构建页、截图原图）、日志与编辑器目录。

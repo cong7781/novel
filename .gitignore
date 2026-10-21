@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# generated output: run artifacts, built pages, screenshots, measurement logs
+out/
+*.log
+
+# local editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# the exported session logs some tools leave behind
+*.v4.jsonl.zstd

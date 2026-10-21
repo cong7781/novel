@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Character Graph",
+    "description": "Extract the characters and their relationships from a text and draw them as a graph you can click."
+  }
+}

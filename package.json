@@ -1,0 +1,71 @@
+{
+  "name": "dsh-character-graph",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Extract characters and their relationships from Chinese narrative text (up to 600k characters: chunking + BM25 retrieval + verbatim quotes) and render them as an interactive force-directed graph inside DSH conversations.",
+  "license": "MIT",
+  "author": "cong7781",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cong7781/novel.git"
+  },
+  "homepage": "https://github.com/cong7781/novel#readme",
+  "bugs": {
+    "url": "https://github.com/cong7781/novel/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "character-graph",
+    "relationship-graph",
+    "chinese",
+    "nlp",
+    "rag",
+    "bm25",
+    "d3-force"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "icon": "./icon.svg",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib/",
+    "locale/",
+    "fixtures/",
+    "icon.svg",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "test": "node scripts/test-highlight.mjs && node scripts/test-host.mjs && node scripts/test-pipeline.mjs && node scripts/test-client.mjs",
+    "extract": "node scripts/extract-cli.mjs",
+    "viewer": "node scripts/serve.mjs",
+    "build:viewer": "node scripts/build-viewer.mjs",
+    "fixtures:long": "node scripts/make-longtext.mjs"
+  },
+  "devDependencies": {
+    "d3-force": "^3.0.0",
+    "esbuild": "^0.25.0"
+  }
+}

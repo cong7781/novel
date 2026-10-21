@@ -1,0 +1,7 @@
+# Keep the repository LF so macOS/Linux contributors and CI see the same bytes;
+# Windows launchers keep CRLF because cmd.exe needs it.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary

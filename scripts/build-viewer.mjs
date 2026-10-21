@@ -20,6 +20,9 @@ const outPath = resolve(root, process.argv[3] ?? 'out/character-graph.html')
 
 const data = JSON.parse(await readFile(dataPath, 'utf8'))
 
+// The page footer shows which version built it, so a screenshot can be dated against the changelog.
+const version = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')).version ?? '0.0.0'
+
 const bundle = await buildBundle()
 
 const script = bundle.text
@@ -268,7 +271,7 @@ const html = `<!doctype html>
 <div class="wrap">
   <header>
     <div>
-      <h1>角色关系网 <span style="font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0">build ${stamp}</span></h1>
+      <h1>角色关系网 <span style="font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0">v${escapeHtml(version)} · build ${stamp} · <a href="https://github.com/cong7781/novel/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer" style="color:var(--muted);text-decoration:none;border-bottom:1px dotted currentColor">更新日志</a></span></h1>
       <div class="stats" id="stats">
         ${stats.nodes ?? data.nodes.length} 个角色 · ${stats.edges ?? data.edges.length} 条关系 ·
         ${escapeHtml(String(data.source?.name ?? '文本'))}${stats.chars ? `（${stats.chars} 字）` : ''}

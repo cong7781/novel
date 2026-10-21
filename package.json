@@ -1,6 +1,6 @@
 {
   "name": "dsh-character-graph",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Extract characters and their relationships from Chinese narrative text (up to 600k characters: chunking + BM25 retrieval + verbatim quotes) and render them as an interactive force-directed graph inside DSH conversations.",
   "license": "MIT",
